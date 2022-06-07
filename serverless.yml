@@ -1,0 +1,58 @@
+service: blog
+
+provider:
+    name: aws
+    # The AWS region in which to deploy (us-east-1 is the default)
+    region: eu-north-1
+    # The stage of the application, e.g. dev, production, staging… ('dev' is the default)
+    stage: dev
+    runtime: provided.al2
+    lambdaHashingVersion: 20201221
+    environment:
+        LOG_CHANNEL: stderr
+        SESSION_DRIVER: array
+        DB_HOST: ${ssm:blog_db_host}
+        DB_DATABASE: ${ssm:blog_db_database}
+        DB_USERNAME: ${ssm:blog_db_username}
+        DB_PASSWORD: ${ssm:blog_db_password}
+        CACHE_DRIVER: array
+plugins:
+    - ./vendor/bref/bref
+
+package:
+    # Directories to exclude from deployment
+    patterns:
+        - '!node_modules/**'
+        - '!public/storage'
+        - '!resources/assets/**'
+        - '!storage/**'
+        - '!tests/**'
+
+functions:
+    api:
+        handler: public/index.php
+        timeout: 28 # in seconds (API Gateway has a timeout of 29 seconds)
+        vpc:
+            securityGroupIds:
+                - sg-08d203eeb7afd44ef
+            subnetIds:
+                - subnet-037e62f8a24d32a9c
+                - subnet-06e0afb54dee0a090
+                - subnet-039a3a62605500e6f
+        layers:
+            - ${bref:layer.php-81-fpm}
+        events:
+            -   httpApi: '*'
+    artisan:
+        handler: artisan
+        timeout: 40 # in seconds
+        vpc:
+            securityGroupIds:
+                - sg-08d203eeb7afd44ef
+            subnetIds:
+                - subnet-037e62f8a24d32a9c
+                - subnet-06e0afb54dee0a090
+                - subnet-039a3a62605500e6f
+        layers:
+            - ${bref:layer.php-81-fpm} # PHP
+            - ${bref:layer.console} # The "console" layer
